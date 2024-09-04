@@ -8,9 +8,12 @@
 .card {
     transition: all 200ms;
     flex-shrink: 0;
-    margin-left: -15px;
 }
 
-.card:first-of-type {
-    margin-left: 0;
+.played .card {
+    top: 0;
+}
+
+.hand .card {
+    margin-left: -15px;
 }
