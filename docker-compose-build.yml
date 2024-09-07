@@ -1,35 +1,36 @@
+version: "3"
+
 services:
   front:
-    container_name: front
+    container_name: santa-front
     build:
       context: front
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile-build
     volumes:
-      - front:/app
+      - front_certs:/etc/nginx/certs
     ports:
-      - "3000:3000"
+      - "6980:80"
     restart: always
 
   back:
-    container_name: back
+    container_name: santa-back
     networks:
       - database
     build:
       context: back
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile-build
     env_file: .env
     volumes:
       - back:/app
     ports:
       - "3001:3001"
-      - "3003:3003"
     depends_on:
       - database
     restart: always
 
   database:
     image: postgres
-    container_name: database
+    container_name: santa-database
     networks:
       - database
     volumes:
@@ -41,12 +42,12 @@ services:
     restart: always
 
 volumes:
-  front:
+  front_certs:
     driver: local
     driver_opts:
       type: "none"
       o: "bind"
-      device: "front/docker-storage"
+      device: "front/nginx/security"
   back:
     driver: local
     driver_opts:
@@ -59,7 +60,6 @@ volumes:
       type: "none"
       o: "bind"
       device: "database"
-
 
 networks:
   database:
