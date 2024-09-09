@@ -1,7 +1,6 @@
 import { MessageBody, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server } from 'socket.io';
-import { Logger } from '@nestjs/common';
-import { Game } from './game.interface';
+import { Game, User } from './game.interface';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QuestionCardEntity } from '../database/entities/questionCard.entity';
 import { Repository } from 'typeorm';
@@ -30,28 +29,116 @@ export class GameGateway {
     return game.users.find((user) => user.id === id);
   }
 
+  findCardById(user: User, id: number) {
+    return user.cardList.find((card) => card.id === id);
+  }
+
+  listWaitingUsers(game: Game) {
+    return (game.users
+      .filter((user) => user.playedCard.length !== game.question.answer && user.id !== game.askerId)
+      .map((user) => ({ id: user.id, name: user.name })));
+  }
+
+  findUserFromCard(game: Game, cardId: number) {
+    return (game.users.find((user) => user.playedCard.find((userCard) => userCard.id === cardId)));
+  }
+
   filterGame(game: Game) {
     const { answerCards, questionCards, users, ...filteredGame } = game;
     const filteredUsers = users.map((user) => ({
       id: user.id,
       name: user.name,
       score: user.score,
-    }))
-    return {users: filteredUsers, ...filteredGame}
+    }));
+    return { users: filteredUsers, ...filteredGame };
   }
 
-  private logger = new Logger('GameGateway');
-
-  //TODO
-  @SubscribeMessage('message')
-  handleMessage(@MessageBody() message: string): void {
-    this.server.emit('message', message);
+  newRound(game: Game) {
+    game.question = game.questionCards[Math.floor(Math.random() * game.questionCards.length)];
+    game.questionCards = game.questionCards.filter((card) => card.id != game.question.id);
+    game.users.forEach((user) => {
+      while (user.cardList.length < 7) {
+        const pickedCard = game.answerCards[Math.floor(Math.random() * game.answerCards.length)];
+        game.answerCards = game.answerCards.filter((card) => card.id != pickedCard.id);
+        user.cardList.push(pickedCard);
+      }
+      user.playedCard = [];
+    });
   }
 
-  //TODO
   @SubscribeMessage('play')
-  playCards(@MessageBody() message) {
-    this.logger.log(message);
+  playCards(@MessageBody() payload: { code: string, id: string, cards: number[] }) {
+    const game = this.findGameByCode(payload.code);
+    const user = this.findUserById(game, payload.id);
+
+    if (user.id === game.askerId) {
+      this.server.to(payload.id).emit('error', 'you can\'t play cards');
+      return;
+    }
+    const playedCards = payload.cards.map((card) => this.findCardById(user, card));
+    if (playedCards.find((card) => !card)) {
+      this.server.to(payload.id).emit('error', 'invalid card');
+      return;
+    }
+
+    user.cardList = user.cardList.filter((card) => !payload.cards.includes(card.id));
+    user.playedCard = playedCards;
+    const waitingUsers = this.listWaitingUsers(game);
+    if (waitingUsers.length === 0) {
+      const finalCards = game.users
+        .filter((user) => user.id !== game.askerId)
+        .map((user) => user.playedCard);
+
+      for (let i = finalCards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [finalCards[i], finalCards[j]] = [finalCards[j], finalCards[i]];
+      }
+
+      this.server.emit(payload.code, {
+        event: 'voting',
+        cards: finalCards,
+      });
+    } else
+      this.server.emit(payload.code, {
+        event: 'waiting',
+        waiting: waitingUsers,
+      });
+  }
+
+  @SubscribeMessage('vote')
+  vote(@MessageBody() payload: {
+    id: string,
+    code: string,
+    card: number
+  }) {
+    const game = this.findGameByCode(payload.code);
+    if (payload.id === game.askerId) {
+      const winner = this.findUserFromCard(game, payload.card);
+      if (winner) {
+        console.log('winner: ' + winner.name);
+        winner.score++;
+        game.askerId = winner.id;
+
+        if (winner.score >= 1) {
+          this.server.emit(game.code, { event: 'end', winner: winner.name, game: this.filterGame(game) });
+          this.games = this.games.filter((game2) => game2.code != game.code);
+          return;
+        }
+
+        this.newRound(game);
+        this.server.emit(game.code, { event: 'round', winner, game: this.filterGame(game) });
+
+        game.users.forEach((user) => {
+          this.server.to(user.id).emit(game.code, {
+            event: 'cards',
+            cards: this.findUserById(game, user.id).cardList,
+          });
+        });
+
+      } else
+        this.server.to(payload.id).emit('error', 'invalid card');
+    } else
+      this.server.to(payload.id).emit('error', 'you can\'t vote');
   }
 
   @SubscribeMessage('checkGame')
@@ -59,17 +146,10 @@ export class GameGateway {
     id: string,
     code: string,
   }): void {
-    console.log('0 ' + payload);
-    // console.log('1 ' +this.games[0].code);
-    // console.log('2 ' + payload.code);
     const game = this.games.find(game => game.code === payload.code);
-    console.log(game);
     if (!game) {
-      console.log('not found');
       this.server.to(payload.id).emit('error', 'not found');
     } else {
-      console.log('found');
-      console.log(game);
       this.server.to(payload.id).emit('join', game);
     }
   }
@@ -87,11 +167,8 @@ export class GameGateway {
       }
       tries++;
     } while (this.findGameByCode(code) || tries > 1000);
-    console.log('created');
     if (tries > 1000) {
       this.server.to(paylod.id).emit('error', 'too many tries');
-      // return ({ error: 'too many tries' });
-
     } else {
       this.games.push({
         code,
@@ -101,11 +178,9 @@ export class GameGateway {
         askerId: undefined,
         questionCards: [],
         answerCards: [],
-        question: undefined
+        question: undefined,
       });
-      console.log(this.games);
       this.server.to(paylod.id).emit('create', code);
-      // return ({ code });
     }
   }
 
@@ -143,33 +218,63 @@ export class GameGateway {
     console.log('startGame');
     const game = this.findGameByCode(payload.code);
     if (game) {
+      if (game.users.length < 2) {
+        this.server.to(payload.id).emit('error', 'not enough player');
+        return;
+      }
+
       if (game.ownerId === payload.id) {
         game.started = true;
-        //get all question cards
+        const findQuestions = this.questionCardRepository.find();
+        const findAnswers = this.answercardRepository.find();
+
+        /*
         this.questionCardRepository.find().then((questionCards) => {
-          game.questionCards = questionCards;
+          game.questionCards = [...questionCards];
         });
+        console.log('answer1');
         this.answercardRepository.find().then((answerCards) => {
-          game.answerCards = answerCards;
+          console.log('answer2');
+          // game.answerCards = [...answerCards];
+          game.answerCards = answerCards.map((card) => (
+            {id: card.id, text: card.text}
+          ))
+          console.log(game.answerCards);
         });
+        console.log('answer3');
+        console.log(game.answerCards);
+        */
 
-        for (const user of game.users) {
-          for (let i = 0; i < 7; i++) {
-            const pickedCard = game.answerCards[Math.floor(Math.random() * game.answerCards.length)]
-            game.answerCards = game.answerCards.filter((card) => card.id != pickedCard.id);
-            user.cardList.push(pickedCard);
+        Promise.all([findQuestions, findAnswers]).then(([questionCards, answerCards]) => {
+          game.questionCards = [...questionCards];
+          game.answerCards = [...answerCards];
+
+          for (const user of game.users) {
+            for (let i = 0; i < 7; i++) {
+              const pickedCard = game.answerCards[Math.floor(Math.random() * game.answerCards.length)];
+              game.answerCards = game.answerCards.filter((card) => card.id != pickedCard.id);
+              user.cardList.push(pickedCard);
+            }
           }
-        }
 
-        {
-          const pickedCard = game.questionCards[Math.floor(Math.random() * game.questionCards.length)];
-          game.questionCards = game.questionCards.filter((card) => card.id != pickedCard.id);
-          game.question = pickedCard;
-        }
-        this.server.emit(game.code, { event: 'game', game: this.filterGame(game) });
-        for (const user of game.users) {
-          this.server.to(user.id).emit('cards', this.findUserById(game, user.id).cardList);
-        }
+          {
+            const pickedCard = game.questionCards[Math.floor(Math.random() * game.questionCards.length)];
+            game.questionCards = game.questionCards.filter((card) => card.id != pickedCard.id);
+            game.question = pickedCard;
+          }
+          this.server.emit(game.code, { event: 'game', game: this.filterGame(game) });
+          this.server.emit(payload.code, {
+            event: 'waiting',
+            waiting: this.listWaitingUsers(game),
+          });
+          game.users.forEach((user) => {
+            this.server.to(user.id).emit(game.code, {
+              event: 'cards',
+              cards: this.findUserById(game, user.id).cardList,
+            });
+          });
+        }).catch((error) => this.server.to(payload.id).emit('error', error));
+
       } else
         this.server.to(payload.id).emit('error', 'not owner');
     } else {
