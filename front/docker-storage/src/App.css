@@ -1,7 +1,7 @@
 #root {
     max-width: 1280px;
     margin: 0 auto;
-    padding: 2rem;
+    padding: 0;
     text-align: center;
 }
 
@@ -14,6 +14,11 @@
     top: 0;
 }
 
-.hand .card {
+.hand .card, .voting .card {
     margin-left: -15px;
+}
+
+.selected {
+    border: solid darkgray 3px;
+    border-radius: 5px;
 }

@@ -1,18 +1,15 @@
 import { Button, Center, Fieldset, Flex, PinInput, Title } from '@mantine/core';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import '@mantine/notifications/styles.css';
-import io, { Socket } from 'socket.io-client';
 import { notifications } from '@mantine/notifications';
+import { SocketContext } from '../contexts/SocketContext.tsx';
+import { SocketContextType } from '../contexts/@types.socket.ts';
 
 export default function Welcome() {
   const [code, setCode] = useState<string>('');
 
-  const [socket, setSocket] = useState<Socket>();
+  const { socket } = useContext(SocketContext) as SocketContextType;
 
-  useEffect(() => {
-    const newSocket = io('http://localhost:3003');
-    setSocket(newSocket);
-  }, [setSocket]);
 
   function createListener(code: string) {
     console.log(code);

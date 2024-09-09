@@ -1,35 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useDisclosure, useListState } from '@mantine/hooks';
-import io, { Socket } from 'socket.io-client';
-import { DragDropContext, Draggable, DraggableLocation, Droppable } from '@hello-pangea/dnd';
-import { Button, Card, Center, Divider, Flex, Modal, Paper, Skeleton, Text, TextInput, Title } from '@mantine/core';
-import AnswerCard from '../components/AnswerCard.tsx';
+import { DragDropContext, DraggableLocation } from '@hello-pangea/dnd';
+import { Anchor, Button, Center, Divider, Flex, Modal, Paper, Text, TextInput, Title } from '@mantine/core';
 import '../App.css';
 import { notifications } from '@mantine/notifications';
-import GameInterface from '../Interfaces.ts';
+import { AnswerCardInterface, User } from '../Interfaces.ts';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCrown } from '@fortawesome/free-solid-svg-icons/faCrown';
+import Voting from '../components/Voting.tsx';
+import { SocketContext } from '../contexts/SocketContext.tsx';
+import { SocketContextType } from '../contexts/@types.socket.ts';
+import { GameContext } from '../contexts/GameContext.tsx';
+import { GameContextType } from '../contexts/@types.game.ts';
+import QuestionCard from '../components/QuestionCard.tsx';
+import Playing from '../components/Playing.tsx';
+import { modals } from '@mantine/modals';
 
 export default function Game() {
   const [gameCode] = useState((new URLSearchParams(window.location.search)).get('code'));
   const [name, setName] = useState<string>('');
-  const [game, setGame] = useState<GameInterface>();
 
-  const [question] = useState('Question 1');
   const [playedCards, setPlayedCards] = useListState<{ id: number, text: string }>([]);
   const [answerCards, setAnswerCards] = useListState([{ id: 0, text: '' }]);
+  const [waitingUsers, setWaitingUsers] = useState<string[]>([]);
+  const [allPlayedCards, setAllPlayedCards] = useState<AnswerCardInterface[][]>([]);
 
-  const [socket, setSocket] = useState<Socket>();
-  const [socketReady, setSocketReady] = useState(socket?.connected);
+  const { socket, socketSend } = useContext(SocketContext) as SocketContextType;
+  const { game, updateGame } = useContext(GameContext) as GameContextType;
 
   const [opened, { close }] = useDisclosure(true);
-
-
-  function socketSend(event: string, message: {} = {}) {
-    console.log('event: ' + event);
-    console.log({ id: socket?.id, ...message });
-    socket?.emit(event, { id: socket?.id, ...message });
-  }
 
   function handleErrors(message: string) {
     console.log(message);
@@ -41,31 +40,42 @@ export default function Game() {
       });
 
       location.href = '/';
-    }
+    } else
+      notifications.show({
+        color: 'red',
+        title: 'Error',
+        message: message,
+      });
   }
-
-  useEffect(() => {
-    const newSocket = io('http://localhost:3003');
-    setSocket(newSocket);
-  }, [setSocket]);
-
-  socket?.on('connect', () => {
-    setSocketReady(true);
-  });
-
-  useEffect(() => {
-    if (!socketReady)
-      return;
-    console.log('send check');
-    socketSend('checkGame', { code: gameCode });
-  }, [socketReady]);
 
 
   function gameInfos(payload: any) {
     console.log('gameInfos');
     console.log(payload);
-    if (payload?.event === 'game')
-      setGame(payload.game);
+    switch (payload?.event) {
+      case 'game':
+        updateGame(payload.game);
+        break;
+      case 'cards':
+        console.log(payload);
+        getCards(payload.cards);
+        break;
+      case 'waiting':
+        setWaitingUsers(payload.waiting.map((user: User) => user.name));
+        console.log(payload.waiting);
+        break;
+      case 'voting':
+        setAllPlayedCards(payload.cards);
+        break;
+      case 'round':
+        setAllPlayedCards([]);
+        setPlayedCards.remove(...Array.from({ length: playedCards.length }, (_, i) => i));
+        updateGame(payload.game);
+        break;
+      case 'end':
+        endGame(payload);
+        break;
+    }
   }
 
   function joinGame() {
@@ -74,6 +84,27 @@ export default function Game() {
 
   function startGame() {
     socketSend('start', { code: gameCode });
+  }
+
+  function getCards(payload: AnswerCardInterface[]) {
+    setAnswerCards.remove(...Array.from({ length: answerCards.length }, (_, i) => i));
+    setAnswerCards.setState(payload);
+  }
+
+  function endGame(payload: { winner: string }) {
+    modals.open({
+      title: 'Fin de partie',
+      children: (
+        <Center>
+          <Text>{payload.winner} remporte la partie !</Text>
+          <Anchor href={'/'}>
+            <Button>Retourner a l'accueil</Button>
+          </Anchor>
+        </Center>
+      ),
+      withCloseButton: false,
+      onClose: () => {}
+    });
   }
 
   useEffect(() => {
@@ -88,14 +119,10 @@ export default function Game() {
   }, [gameInfos, gameCode]);
 
   useEffect(() => {
-    console.log(game);
     if (game?.users.find((user) => user.id === socket?.id))
       close();
   }, [game, socket]);
 
-
-  function validate(): void {
-  }
 
   const move = (source: { id: number, text: string }[],
                 destination: { id: number, text: string }[],
@@ -123,25 +150,23 @@ export default function Game() {
   if (!game?.started)
     return (
       <Flex align={'center'} justify={'space-evenly'}>
-        <Skeleton visible={!socketReady}>
-          <Modal opened={opened}
-                 centered
-                 onClose={name ? joinGame : () => {
-                 }}
-                 title={'Entrez votre pseudo'}
-                 size={'auto'}
-                 overlayProps={{
-                   backgroundOpacity: 0.5,
-                   blur: 3,
-                 }}
-          >
-            <Flex align={'center'} direction={'column'} gap={'md'}>
-              <TextInput data-autofocus value={name} onChange={(e) => setName(e.target.value)} />
-              <Button onClick={name ? joinGame : () => {
-              }}>Valider</Button>
-            </Flex>
-          </Modal>
-        </Skeleton>
+        <Modal opened={opened}
+               centered
+               onClose={name ? joinGame : () => {
+               }}
+               title={'Entrez votre pseudo'}
+               size={'auto'}
+               overlayProps={{
+                 backgroundOpacity: 0.5,
+                 blur: 3,
+               }}
+        >
+          <Flex align={'center'} direction={'column'} gap={'md'}>
+            <TextInput data-autofocus value={name} onChange={(e) => setName(e.target.value)} />
+            <Button onClick={name ? joinGame : () => {
+            }}>Valider</Button>
+          </Flex>
+        </Modal>
 
         <Flex direction="column" align={'center'} w={'100%'} h={'100%'} gap={'md'}>
           <Paper radius={'md'} withBorder mih={'30vh'} p={'sm'} maw={550} miw={250}>
@@ -155,7 +180,7 @@ export default function Game() {
             )}
           </Paper>
           {socket?.id === game?.ownerId ?
-            <Button onClick={startGame} disabled={(game?.users.length ?? 0) < 3}>Start game</Button>
+            <Button onClick={startGame} disabled={(game?.users.length ?? 0) < -1}>Start game</Button>
             : null
           }
         </Flex>
@@ -164,12 +189,7 @@ export default function Game() {
 
   return (
     <>
-      <Center>
-        <Card shadow={'sm'} withBorder radius={'lg'}
-              w={160} h={225} pos={'absolute'} top={15} bg={'dark'}>
-          <Text c={'white'} size={'sm'} ta={'left'}>{question}</Text>
-        </Card>
-      </Center>
+      <QuestionCard question={game.question?.text ?? ''} />
       <DragDropContext
         onDragEnd={({ destination, source }) => {
 
@@ -191,67 +211,24 @@ export default function Game() {
           }
         }}
       >
-        <Flex direction={'column'}>
-          <Text fs={'italic'}>Your submission</Text>
-          <Card shadow={'sm'} withBorder radius={'lg'}
-                w={(game.question?.answer ?? 1) * 160} h={230} pos={'relative'}
-                className={'played'}
-          >
-            <Droppable droppableId={'played-cards'} direction={'horizontal'}
-                       isDropDisabled={playedCards.length >= (game.question?.answer ?? 1)}>
-              {(provided) => (
-                <Flex justify={'space-between'} h={'100%'} w={'100%'} align={'center'}
-                      {...provided.droppableProps}
-                      ref={provided.innerRef}>
-                  {playedCards.map((item, index) => (
-                    <Draggable key={item.id} index={index} draggableId={item.id + ''}>
-                      {(provided) => (
-                        <div
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          ref={provided.innerRef}
-                        >
-                          <AnswerCard text={item.text} />
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </Flex>
-              )}
-            </Droppable>
-          </Card>
-          <Button disabled={playedCards.length != (game.question?.answer ?? 1)} m={'sm'} onClick={validate}>
-            Validate
-          </Button>
+        <Flex direction={'column'} align={'center'}>
+          {!allPlayedCards.length ?
+            <Text p={'xl'}>En attente de {waitingUsers.join(', ')}</Text> : null}
+          {allPlayedCards.length === game.users.length - 1 ?
+            <Voting playerNumber={game.users.length - 1} cards={allPlayedCards} socket={socket}
+                    isAsker={game.askerId === socket?.id}
+                    askerName={game.users.find((user) => user.id === game.askerId)?.name ?? 'inconnu'}
+                    code={gameCode}
+            />
+            : null
+          }
+
+          {socket?.id !== game.askerId && !allPlayedCards.length ?
+            <Playing playedCards={playedCards} answerCards={answerCards} />
+            : null
+          }
         </Flex>
 
-        <Droppable droppableId={'answer-cards'} direction={'horizontal'}>
-          {(provided) => (
-            <Center>
-              <Flex bottom={-30} mx={'sm'} pl={20}
-                    pos={'fixed'}
-                    className={'hand'}
-                    {...provided.droppableProps}
-                    ref={provided.innerRef}>
-                {answerCards.map((item, index) => (
-                  <Draggable key={item.id} index={index} draggableId={item.id + ''}>
-                    {(provided) => (
-                      <div
-                        {...provided.draggableProps}
-                        {...provided.dragHandleProps}
-                        ref={provided.innerRef}
-                      >
-                        <AnswerCard text={item.text} />
-                      </div>
-                    )}
-                  </Draggable>
-                ))}
-                {provided.placeholder}
-              </Flex>
-            </Center>
-          )}
-        </Droppable>
       </DragDropContext>
     </>
   );
