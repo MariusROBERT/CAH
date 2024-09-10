@@ -4,16 +4,17 @@ import '@mantine/notifications/styles.css';
 import { notifications } from '@mantine/notifications';
 import { SocketContext } from '../contexts/SocketContext.tsx';
 import { SocketContextType } from '../contexts/@types.socket.ts';
+import { useNavigate } from 'react-router-dom';
 
 export default function Welcome() {
   const [code, setCode] = useState<string>('');
 
   const { socket } = useContext(SocketContext) as SocketContextType;
 
+  const navigate = useNavigate();
 
   function createListener(code: string) {
-    console.log(code);
-    window.location.href = '/game?code=' + code;
+    navigate('/game?code=' + code);
   }
 
   function handleErrors(message: string) {

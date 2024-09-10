@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import io, { Socket } from 'socket.io-client';
 import { SocketContextType } from './@types.socket.ts';
+import { socketURL } from '../constants.ts';
 
 export const SocketContext = React.createContext<SocketContextType | undefined>(undefined);
 
@@ -8,7 +9,7 @@ export default function SocketProvider({ children }: { children: React.ReactNode
   const [socket, setSocket] = useState<Socket | undefined>(undefined);
 
   useEffect(() => {
-    const newSocket = io('http://localhost:3003');
+    const newSocket = io(socketURL);
     setSocket(newSocket);
   }, [setSocket]);
 
@@ -17,8 +18,8 @@ export default function SocketProvider({ children }: { children: React.ReactNode
   }
 
   function socketSend(event: string, message: {} = {}) {
-    console.log('event: ' + event);
-    console.log({ id: socket?.id, ...message });
+    // console.log('event: ' + event);
+    // console.log({ id: socket?.id, ...message });
     socket?.emit(event, { id: socket?.id, ...message });
   }
 

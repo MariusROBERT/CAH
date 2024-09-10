@@ -18,17 +18,25 @@ export class AppService {
     this.questionCardRepository.insert({
       text: question,
       answer: answerNumber,
-    }).then()
+    }).then();
   }
 
   addAnswer(answer: string): void {
     this.answercardRepository.insert({
       text: answer,
-    }).then()
+    }).then();
   }
 
 
   getHello(): string {
     return 'Hello World!';
+  }
+
+  async addBulkQuestion(data: { text: string; answer: number }[]) {
+    return this.questionCardRepository.insert(data);
+  }
+
+  async addBulkAnswer(data: { text: string }[]) {
+    return this.answercardRepository.insert(data);
   }
 }

@@ -1,10 +1,10 @@
 import { useContext, useEffect, useState } from 'react';
 import { useDisclosure, useListState } from '@mantine/hooks';
 import { DragDropContext, DraggableLocation } from '@hello-pangea/dnd';
-import { Anchor, Button, Center, Divider, Flex, Modal, Paper, Text, TextInput, Title } from '@mantine/core';
+import { Anchor, Button, Divider, Flex, Modal, Paper, Text, TextInput, Title } from '@mantine/core';
 import '../App.css';
 import { notifications } from '@mantine/notifications';
-import { AnswerCardInterface, User } from '../Interfaces.ts';
+import GameInterface, { AnswerCardInterface, User } from '../Interfaces.ts';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCrown } from '@fortawesome/free-solid-svg-icons/faCrown';
 import Voting from '../components/Voting.tsx';
@@ -31,7 +31,7 @@ export default function Game() {
   const [opened, { close }] = useDisclosure(true);
 
   function handleErrors(message: string) {
-    console.log(message);
+    console.error(message);
     if (message === 'not found' && !game) {
       notifications.show({
         color: 'red',
@@ -50,19 +50,15 @@ export default function Game() {
 
 
   function gameInfos(payload: any) {
-    console.log('gameInfos');
-    console.log(payload);
     switch (payload?.event) {
       case 'game':
         updateGame(payload.game);
         break;
       case 'cards':
-        console.log(payload);
         getCards(payload.cards);
         break;
       case 'waiting':
         setWaitingUsers(payload.waiting.map((user: User) => user.name));
-        console.log(payload.waiting);
         break;
       case 'voting':
         setAllPlayedCards(payload.cards);
@@ -75,11 +71,22 @@ export default function Game() {
       case 'end':
         endGame(payload);
         break;
+      case 'leave':
+        notifications.show({
+          color: 'blue',
+          title: 'Déconnexion',
+          message: `${payload.leaver} a quitté la partie`,
+        });
+        break;
     }
   }
 
   function joinGame() {
     socketSend('join', { code: gameCode, name });
+  }
+
+  function joinHandler(payload: GameInterface) {
+    updateGame(payload);
   }
 
   function startGame() {
@@ -95,24 +102,32 @@ export default function Game() {
     modals.open({
       title: 'Fin de partie',
       children: (
-        <Center>
-          <Text>{payload.winner} remporte la partie !</Text>
+        <Flex direction={'column'} align={'center'}>
+          {/*TODO: ajouter le score des autres en dessous*/}
+          {payload.winner ?
+            <Text>{payload.winner} remporte la partie !</Text> :
+            <Text>Partie terminée par manque de joueurs</Text>
+          }
           <Anchor href={'/'}>
             <Button>Retourner a l'accueil</Button>
           </Anchor>
-        </Center>
+        </Flex>
       ),
       withCloseButton: false,
-      onClose: () => {}
+      onClose: () => {
+      },
     });
   }
 
   useEffect(() => {
     socket?.on('error', handleErrors);
-    if (gameCode)
+    socket?.on('join', joinHandler);
+    if (gameCode) {
       socket?.on(gameCode, gameInfos);
+    }
     return () => {
       socket?.off('error', handleErrors);
+      socket?.off('join', joinHandler);
       if (gameCode)
         socket?.off(gameCode, gameInfos);
     };
@@ -122,6 +137,11 @@ export default function Game() {
     if (game?.users.find((user) => user.id === socket?.id))
       close();
   }, [game, socket]);
+
+  useEffect(() => {
+    if (socket?.id)
+      socketSend('checkGame', { code: gameCode });
+  }, []);
 
 
   const move = (source: { id: number, text: string }[],
@@ -163,8 +183,9 @@ export default function Game() {
         >
           <Flex align={'center'} direction={'column'} gap={'md'}>
             <TextInput data-autofocus value={name} onChange={(e) => setName(e.target.value)} />
-            <Button onClick={name ? joinGame : () => {
-            }}>Valider</Button>
+            <Button onClick={name ? joinGame : () => {}}>
+              Valider
+            </Button>
           </Flex>
         </Modal>
 
@@ -180,7 +201,7 @@ export default function Game() {
             )}
           </Paper>
           {socket?.id === game?.ownerId ?
-            <Button onClick={startGame} disabled={(game?.users.length ?? 0) < -1}>Start game</Button>
+            <Button onClick={startGame} disabled={(game?.users.length ?? 0) < 3}>Démarrer la partie</Button>
             : null
           }
         </Flex>

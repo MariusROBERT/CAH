@@ -6,7 +6,6 @@ import { DatabaseModule } from './database/database.module';
 import { ConfigModule } from '@nestjs/config';
 import { QuestionCardEntity } from './database/entities/questionCard.entity';
 import { AnswerCardEntity } from './database/entities/answerCard.entity';
-import { GameGateway } from './game/game.gateway';
 import { GameModule } from './game/game.module';
 
 @Module({

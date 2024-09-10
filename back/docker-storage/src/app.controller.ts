@@ -20,4 +20,14 @@ export class AppController {
   addAnswer(@Body() data: { text: string }) {
     return this.appService.addAnswer(data.text);
   }
+
+  @Post('/bulkQuestion')
+  addBulkQuestion(@Body() data: { text: string, answer: number }[]) {
+    return this.appService.addBulkQuestion(data);
+  }
+
+  @Post('/bulkAnswer')
+  addBulkAnswer(@Body() data: { text: string }[]) {
+    return this.appService.addBulkAnswer(data);
+  }
 }

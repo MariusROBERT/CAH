@@ -2,7 +2,7 @@ import { Button, Card, Center, Flex, Text } from '@mantine/core';
 import { Draggable, Droppable } from '@hello-pangea/dnd';
 import AnswerCard from './AnswerCard.tsx';
 import { AnswerCardInterface } from '../Interfaces.ts';
-import { useContext } from 'react';
+import { useContext, useState } from 'react';
 import { GameContext } from '../contexts/GameContext.tsx';
 import { GameContextType } from '../contexts/@types.game.ts';
 import { SocketContext } from '../contexts/SocketContext.tsx';
@@ -16,15 +16,15 @@ interface Props {
 export default function Playing(props: Props) {
   const { game } = useContext(GameContext) as GameContextType;
   const { socketSend } = useContext(SocketContext) as SocketContextType;
+  const [canPlay, setCanPlay] = useState(true);
 
   function play(): void {
-    console.log(props.playedCards.length, game?.question?.answer);
     if (props.playedCards.length === game?.question?.answer) {
-      console.log('play');
       socketSend('play', {
         code: game.code,
         cards: props.playedCards.map((card) => card.id),
       });
+      setCanPlay(false);
     }
   }
 
@@ -60,9 +60,12 @@ export default function Playing(props: Props) {
             )}
           </Droppable>
         </Card>
-        <Button disabled={props.playedCards.length != (game?.question?.answer ?? 1)} m={'sm'} onClick={play}>
-          Valider
-        </Button>
+        {canPlay ?
+          <Button disabled={props.playedCards.length != (game?.question?.answer ?? 1)} m={'sm'} onClick={play}>
+            Valider
+          </Button>
+          : null
+        }
       </Flex>
       <Flex>
         <Droppable droppableId={'answer-cards'} direction={'horizontal'}>

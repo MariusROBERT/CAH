@@ -1,13 +1,20 @@
-import { MessageBody, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
-import { Server } from 'socket.io';
+import {
+  MessageBody,
+  OnGatewayConnection, OnGatewayDisconnect,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
+} from '@nestjs/websockets';
+import { Server, Socket } from 'socket.io';
 import { Game, User } from './game.interface';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QuestionCardEntity } from '../database/entities/questionCard.entity';
 import { Repository } from 'typeorm';
 import { AnswerCardEntity } from '../database/entities/answerCard.entity';
+import { frontURL } from '../constants';
 
-@WebSocketGateway(3003, { cors: '*' })
-export class GameGateway {
+@WebSocketGateway(3003, { cors: frontURL })
+export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     @InjectRepository(QuestionCardEntity)
     private questionCardRepository: Repository<QuestionCardEntity>,
@@ -17,9 +24,53 @@ export class GameGateway {
   }
 
   private games: Game[] = [];
+  private clients: string[] = [];
+
 
   @WebSocketServer()
   server: Server;
+
+  async handleConnection(client: Socket) {
+    if (this.clients.find((c) => c === client.id)) return;
+    // console.log('new client ' + client.id);
+    this.clients.push(client.id);
+  }
+
+  async handleDisconnect(client: Socket) {
+      // await new Promise((res) => (setTimeout(res, 10000)));
+
+      // if (this.clients.find((c) => c === client.id)) return; // the client.id reconnect in the 10 seconds.
+
+      // console.log('client disconnected ' + client.id);
+      const game = this.findGameByUserId(client.id);
+      if (!game)
+        return;
+
+      game.users = game.users.filter((user) => user.id !== client.id);
+      if (game.ownerId === client.id)
+      {
+        if (game.users.length > 0)
+          game.ownerId = game.users[0].id;
+        else {
+          this.games.filter((game2) => game2.code !== game.code);
+          console.log('deleted game ' + game.code);
+          return;
+        }
+      }
+      if (game.users.length < 3) {
+        this.games = this.games.filter((game2) => game2.code !== game.code);
+        this.server.emit(game.code, { event: 'end', game: this.filterGame(game) });
+        return;
+      }
+      if (game.askerId === client.id)
+      {
+        game.askerId = game.users[Math.floor(Math.random() * game.users.length)].id;
+        this.newRound(game);
+        this.server.emit(game.code, { event: 'leave', leaver: this.findUserById(game, client.id).name });
+      }
+      this.server.emit(game.code, { event: 'game', game: this.filterGame(game) });
+  }
+
 
   findGameByCode(code: string): Game | undefined {
     return this.games.find(game => game.code === code);
@@ -27,6 +78,12 @@ export class GameGateway {
 
   findUserById(game: Game, id: string) {
     return game.users.find((user) => user.id === id);
+  }
+
+  findGameByUserId(id: string) {
+    const userFromList = this.games.find((game) => game.users.find((user) => user.id === id));
+    const userFromOwner = this.games.find((game) => game.ownerId === id);
+    return (userFromList ?? userFromOwner);
   }
 
   findCardById(user: User, id: number) {
@@ -115,11 +172,10 @@ export class GameGateway {
     if (payload.id === game.askerId) {
       const winner = this.findUserFromCard(game, payload.card);
       if (winner) {
-        console.log('winner: ' + winner.name);
         winner.score++;
         game.askerId = winner.id;
 
-        if (winner.score >= 1) {
+        if (winner.score >= 7) {
           this.server.emit(game.code, { event: 'end', winner: winner.name, game: this.filterGame(game) });
           this.games = this.games.filter((game2) => game2.code != game.code);
           return;
@@ -155,8 +211,7 @@ export class GameGateway {
   }
 
   @SubscribeMessage('create')
-  createGame(@MessageBody() paylod: { id: string }) /*: { code: string } | { error: string }*/ {
-    console.log('create called');
+  createGame(@MessageBody() payload: { id: string }) {
     let code: string;
     let tries = 0;
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -168,25 +223,24 @@ export class GameGateway {
       tries++;
     } while (this.findGameByCode(code) || tries > 1000);
     if (tries > 1000) {
-      this.server.to(paylod.id).emit('error', 'too many tries');
+      this.server.to(payload.id).emit('error', 'too many tries');
     } else {
       this.games.push({
         code,
         users: [],
-        ownerId: undefined,
+        ownerId: payload.id,
         started: false,
-        askerId: undefined,
+        askerId: payload.id,
         questionCards: [],
         answerCards: [],
         question: undefined,
       });
-      this.server.to(paylod.id).emit('create', code);
+      this.server.to(payload.id).emit('create', code);
     }
   }
 
   @SubscribeMessage('join')
   joinGame(@MessageBody() payload: { id: string, code: string, name: string }): void {
-    console.log('join');
     if (!payload.name)
       payload.name = payload.id;
     const game = this.findGameByCode(payload.code);
@@ -210,12 +264,10 @@ export class GameGateway {
     } else {
       this.server.to(payload.id).emit('error', 'not found');
     }
-    console.log(this.games);
   }
 
   @SubscribeMessage('start')
   startGame(@MessageBody() payload: { id: string, code: string }) {
-    console.log('startGame');
     const game = this.findGameByCode(payload.code);
     if (game) {
       if (game.users.length < 2) {
@@ -227,23 +279,6 @@ export class GameGateway {
         game.started = true;
         const findQuestions = this.questionCardRepository.find();
         const findAnswers = this.answercardRepository.find();
-
-        /*
-        this.questionCardRepository.find().then((questionCards) => {
-          game.questionCards = [...questionCards];
-        });
-        console.log('answer1');
-        this.answercardRepository.find().then((answerCards) => {
-          console.log('answer2');
-          // game.answerCards = [...answerCards];
-          game.answerCards = answerCards.map((card) => (
-            {id: card.id, text: card.text}
-          ))
-          console.log(game.answerCards);
-        });
-        console.log('answer3');
-        console.log(game.answerCards);
-        */
 
         Promise.all([findQuestions, findAnswers]).then(([questionCards, answerCards]) => {
           game.questionCards = [...questionCards];
