@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from 'react';
 import { useDisclosure, useListState } from '@mantine/hooks';
 import { DragDropContext, DraggableLocation } from '@hello-pangea/dnd';
-import { Anchor, Button, Divider, Flex, Modal, Paper, Text, TextInput, Title } from '@mantine/core';
+import { Anchor, Button, Divider, Flex, Modal, Paper, Table, Text, TextInput, Title } from '@mantine/core';
 import '../App.css';
 import { notifications } from '@mantine/notifications';
 import GameInterface, { AnswerCardInterface, User } from '../Interfaces.ts';
@@ -103,11 +103,28 @@ export default function Game() {
       title: 'Fin de partie',
       children: (
         <Flex direction={'column'} align={'center'}>
-          {/*TODO: ajouter le score des autres en dessous*/}
           {payload.winner ?
             <Text>{payload.winner} remporte la partie !</Text> :
             <Text>Partie terminée par manque de joueurs</Text>
           }
+          <Table withTableBorder withRowBorders p={'md'} highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th ta={'right'}>Joueur</Table.Th>
+                <Table.Th ta={'left'}>Score</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {game?.users
+                .sort((a, b) => b.score - a.score)
+                .map((user) => (
+                  <Table.Tr key={user.id}>
+                    <Table.Td ta={'right'}>{user.name}</Table.Td>
+                    <Table.Td ta={'left'}>{user.score}</Table.Td>
+                  </Table.Tr>
+                ))}
+            </Table.Tbody>
+          </Table>
           <Anchor href={'/'}>
             <Button>Retourner a l'accueil</Button>
           </Anchor>
@@ -183,7 +200,8 @@ export default function Game() {
         >
           <Flex align={'center'} direction={'column'} gap={'md'}>
             <TextInput data-autofocus value={name} onChange={(e) => setName(e.target.value)} />
-            <Button onClick={name ? joinGame : () => {}}>
+            <Button onClick={name ? joinGame : () => {
+            }}>
               Valider
             </Button>
           </Flex>
@@ -236,10 +254,9 @@ export default function Game() {
           {!allPlayedCards.length ?
             <Text p={'xl'}>En attente de {waitingUsers.join(', ')}</Text> : null}
           {allPlayedCards.length === game.users.length - 1 ?
-            <Voting playerNumber={game.users.length - 1} cards={allPlayedCards} socket={socket}
+            <Voting playerNumber={game.users.length - 1} cards={allPlayedCards}
                     isAsker={game.askerId === socket?.id}
                     askerName={game.users.find((user) => user.id === game.askerId)?.name ?? 'inconnu'}
-                    code={gameCode}
             />
             : null
           }
