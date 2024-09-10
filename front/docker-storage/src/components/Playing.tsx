@@ -1,4 +1,4 @@
-import { Button, Card, Center, Flex, Text } from '@mantine/core';
+import { Button, Card, Center, Flex, ScrollArea, Text } from '@mantine/core';
 import { Draggable, Droppable } from '@hello-pangea/dnd';
 import AnswerCard from './AnswerCard.tsx';
 import { AnswerCardInterface } from '../Interfaces.ts';
@@ -71,26 +71,28 @@ export default function Playing(props: Props) {
         <Droppable droppableId={'answer-cards'} direction={'horizontal'}>
           {(provided) => (
             <Center>
-              <Flex bottom={-30} mx={'sm'} pl={20}
-                    pos={'fixed'}
-                    className={'hand'}
-                    {...provided.droppableProps}
-                    ref={provided.innerRef}>
-                {props.answerCards.map((item, index) => (
-                  <Draggable key={item.id} index={index} draggableId={item.id + ''}>
-                    {(provided) => (
-                      <div
-                        {...provided.draggableProps}
-                        {...provided.dragHandleProps}
-                        ref={provided.innerRef}
-                      >
-                        <AnswerCard text={item.text} />
-                      </div>
-                    )}
-                  </Draggable>
-                ))}
-                {provided.placeholder}
-              </Flex>
+              <ScrollArea maw={'100vw'} pos={'fixed'} left={0} bottom={-30} px={'sm'}>
+                <Flex className={'hand'}
+                      mx={'md'}
+                      mt={30}
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}>
+                  {props.answerCards.map((item, index) => (
+                    <Draggable key={item.id} index={index} draggableId={item.id + ''}>
+                      {(provided) => (
+                        <div
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          ref={provided.innerRef}
+                        >
+                          <AnswerCard text={item.text} />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </Flex>
+              </ScrollArea>
             </Center>
           )}
         </Droppable>
