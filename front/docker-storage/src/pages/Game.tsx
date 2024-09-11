@@ -257,7 +257,7 @@ export default function Game() {
             )}
           </Paper>
           {socket?.id === game?.ownerId ?
-            <Button onClick={startGame} disabled={(game?.users.length ?? 0) < 3} p={'md'}>
+            <Button onClick={startGame} disabled={(game?.users.length ?? 0) < 3} m={'xs'}>
               Démarrer la partie
             </Button>
             : null
