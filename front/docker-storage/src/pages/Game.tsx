@@ -1,7 +1,20 @@
 import { useContext, useEffect, useState } from 'react';
 import { useDisclosure, useListState } from '@mantine/hooks';
 import { DragDropContext, DraggableLocation } from '@hello-pangea/dnd';
-import { Anchor, Button, Divider, Flex, Modal, Paper, Table, Text, TextInput, Title } from '@mantine/core';
+import {
+  Anchor,
+  Button,
+  Divider,
+  Flex,
+  Group,
+  HoverCard,
+  Modal,
+  Paper,
+  Table,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import '../App.css';
 import { notifications } from '@mantine/notifications';
 import GameInterface, { AnswerCardInterface, User } from '../Interfaces.ts';
@@ -15,6 +28,7 @@ import { GameContextType } from '../contexts/@types.game.ts';
 import QuestionCard from '../components/QuestionCard.tsx';
 import Playing from '../components/Playing.tsx';
 import { modals } from '@mantine/modals';
+import { faBars } from '@fortawesome/free-solid-svg-icons';
 
 export default function Game() {
   const [gameCode] = useState((new URLSearchParams(window.location.search)).get('code'));
@@ -24,6 +38,7 @@ export default function Game() {
   const [answerCards, setAnswerCards] = useListState([{ id: 0, text: '' }]);
   const [waitingUsers, setWaitingUsers] = useState<string[]>([]);
   const [allPlayedCards, setAllPlayedCards] = useState<AnswerCardInterface[][]>([]);
+  const [winner, setWinner] = useState<string>('');
 
   const { socket, socketSend } = useContext(SocketContext) as SocketContextType;
   const { game, updateGame } = useContext(GameContext) as GameContextType;
@@ -64,6 +79,14 @@ export default function Game() {
         setAllPlayedCards(payload.cards);
         break;
       case 'round':
+        setWinner(payload.winner.name);
+        setTimeout(() => {
+          setWinner('');
+        }, 5000);
+        setWaitingUsers(payload.game.users
+          .filter((user: User) => user.id !== payload.game.askerId)
+          .map((user: User) => user.name),
+        );
         setAllPlayedCards([]);
         setPlayedCards.remove(...Array.from({ length: playedCards.length }, (_, i) => i));
         updateGame(payload.game);
@@ -228,8 +251,36 @@ export default function Game() {
     );
 
   return (
-    <>
+    <Flex direction={'column'} justify={'space-between'} align={'center'}>
+      <Group pos={'fixed'} top={0} right={0}>
+        <HoverCard width={280} shadow={'md'}>
+          <HoverCard.Target>
+            <Button bg={'gray'} m={'xs'} p={'xs'}><FontAwesomeIcon icon={faBars} /></Button>
+          </HoverCard.Target>
+          <HoverCard.Dropdown>
+            <Table withTableBorder withRowBorders p={'md'} highlightOnHover withColumnBorders>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th ta={'right'}>Joueur</Table.Th>
+                  <Table.Th ta={'left'}>Score</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {game?.users
+                  .sort((a, b) => b.score - a.score)
+                  .map((user) => (
+                    <Table.Tr key={user.id}>
+                      <Table.Td ta={'right'} fs={user.id === socket?.id ? 'italic' : undefined}>{user.name}</Table.Td>
+                      <Table.Td ta={'left'}>{user.score}</Table.Td>
+                    </Table.Tr>
+                  ))}
+              </Table.Tbody>
+            </Table>
+          </HoverCard.Dropdown>
+        </HoverCard>
+      </Group>
       <QuestionCard question={game.question?.text ?? ''} />
+      <Text>{winner ? `${winner} remporte la manche !` : null}</Text>
       <DragDropContext
         onDragEnd={({ destination, source }) => {
 
@@ -269,6 +320,6 @@ export default function Game() {
         </Flex>
 
       </DragDropContext>
-    </>
+    </Flex>
   );
 }
