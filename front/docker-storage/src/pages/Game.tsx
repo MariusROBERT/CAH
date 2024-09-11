@@ -4,12 +4,13 @@ import { DragDropContext, DraggableLocation } from '@hello-pangea/dnd';
 import {
   Anchor,
   Button,
+  CopyButton,
   Divider,
   Flex,
   Group,
   HoverCard,
   Modal,
-  Paper,
+  Paper, Space,
   Table,
   Text,
   TextInput,
@@ -28,7 +29,7 @@ import { GameContextType } from '../contexts/@types.game.ts';
 import QuestionCard from '../components/QuestionCard.tsx';
 import Playing from '../components/Playing.tsx';
 import { modals } from '@mantine/modals';
-import { faBars } from '@fortawesome/free-solid-svg-icons';
+import { faBars, faCopy } from '@fortawesome/free-solid-svg-icons';
 
 export default function Game() {
   const [gameCode] = useState((new URLSearchParams(window.location.search)).get('code'));
@@ -231,7 +232,20 @@ export default function Game() {
           </Flex>
         </Modal>
 
-        <Flex direction="column" align={'center'} w={'100%'} h={'100%'} gap={'md'}>
+        <Flex direction="column" align={'center'} w={'100%'} h={'100%'} gap={'xs'}>
+          <CopyButton value={window.location.href}>
+            {({ copied, copy }) => (
+              <Button variant={'transparent'} onClick={copy} size={'xl'} p={0} w={'100%'}>
+                {copied ?
+                  'Copié' :
+                  <>
+                    {gameCode} <Space mx={5}/>
+                    <FontAwesomeIcon icon={faCopy} />
+                  </>
+                }
+              </Button>
+            )}
+          </CopyButton>
           <Paper radius={'md'} withBorder mih={'30vh'} p={'sm'} maw={550} miw={250}>
             <Title m={'md'}> {game?.users.length ?? 0} Joueurs </Title>
             <Divider m={'sm'} />
@@ -243,7 +257,9 @@ export default function Game() {
             )}
           </Paper>
           {socket?.id === game?.ownerId ?
-            <Button onClick={startGame} disabled={(game?.users.length ?? 0) < 3}>Démarrer la partie</Button>
+            <Button onClick={startGame} disabled={(game?.users.length ?? 0) < 3} p={'md'}>
+              Démarrer la partie
+            </Button>
             : null
           }
         </Flex>
