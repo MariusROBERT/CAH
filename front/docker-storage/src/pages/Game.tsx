@@ -191,6 +191,7 @@ export default function Game() {
                centered
                onClose={name ? joinGame : () => {
                }}
+               withCloseButton={false}
                title={'Entrez votre pseudo'}
                size={'auto'}
                overlayProps={{
