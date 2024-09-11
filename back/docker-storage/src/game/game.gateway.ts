@@ -215,7 +215,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     id: string,
     code: string,
   }): void {
-    const game = this.games.find(game => game.code === payload.code);
+    const game = this.games.find(game => game.code.toUpperCase() === payload.code);
     if (!game) {
       this.server.to(payload.id).emit('error', 'not found');
     } else {
