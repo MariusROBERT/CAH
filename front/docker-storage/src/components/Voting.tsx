@@ -1,7 +1,7 @@
 import { Button, Card, Flex, ScrollArea, Text } from '@mantine/core';
 import AnswerCard from './AnswerCard.tsx';
 import { AnswerCardInterface } from '../Interfaces.ts';
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { GameContext } from '../contexts/GameContext.tsx';
 import { GameContextType } from '../contexts/@types.game.ts';
 import { SocketContext } from '../contexts/SocketContext.tsx';
@@ -17,11 +17,31 @@ interface Props {
 export default function Voting(props: Props) {
   const [pickedCard, setPickedCard] = useState<number>(-1);
   const { game } = useContext(GameContext) as GameContextType;
-  const { socket } = useContext(SocketContext) as SocketContextType;
+  const { socket, socketSend } = useContext(SocketContext) as SocketContextType;
 
   function pickCard() {
-    socket?.emit('vote', { id: socket?.id, code: game?.code, card: pickedCard });
+    socketSend('vote', { code: game?.code, card: pickedCard });
   }
+
+  function picking(id: number) {
+    setPickedCard(id);
+    socketSend('voting', { code: game?.code, card: id });
+  }
+
+  function gameInfos(payload: any) {
+    if (payload?.event === 'picking') {
+      setPickedCard(payload.card);
+    }
+  }
+
+  useEffect(() => {
+    if (game?.code)
+      socket?.on(game?.code, gameInfos);
+    return () => {
+      if (game?.code)
+        socket?.off(game?.code, gameInfos);
+    };
+  }, []);
 
   return (
     <Flex direction={'column'} className={'voting'} align={'center'}>
@@ -35,7 +55,7 @@ export default function Voting(props: Props) {
               <Flex justify={'space-between'} h={'100%'} w={'100%'} align={'center'}>
                 {
                   props.cards.map((item, i) => (
-                    <Flex onClick={() => setPickedCard(item[0].id)} direction={'row'} p={'md'} ml={15}
+                    <Flex onClick={() => picking(item[0].id)} direction={'row'} p={'md'} ml={15}
                           className={item[0].id === pickedCard ? 'picked' : undefined} key={i}>
                       {item.map((card) => (
                         <AnswerCard text={card.text} key={card.id} />

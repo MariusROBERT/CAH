@@ -1,6 +1,7 @@
 import {
   MessageBody,
-  OnGatewayConnection, OnGatewayDisconnect,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -37,38 +38,36 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   async handleDisconnect(client: Socket) {
-      // await new Promise((res) => (setTimeout(res, 10000)));
+    // await new Promise((res) => (setTimeout(res, 10000)));
 
-      // if (this.clients.find((c) => c === client.id)) return; // the client.id reconnect in the 10 seconds.
+    // if (this.clients.find((c) => c === client.id)) return; // the client.id reconnect in the 10 seconds.
 
-      // console.log('client disconnected ' + client.id);
-      const game = this.findGameByUserId(client.id);
-      if (!game)
-        return;
+    // console.log('client disconnected ' + client.id);
+    const game = this.findGameByUserId(client.id);
+    if (!game)
+      return;
 
-      game.users = game.users.filter((user) => user.id !== client.id);
-      if (game.ownerId === client.id)
-      {
-        if (game.users.length > 0)
-          game.ownerId = game.users[0].id;
-        else {
-          this.games.filter((game2) => game2.code !== game.code);
-          console.log('deleted game ' + game.code);
-          return;
-        }
-      }
-      if (game.users.length < 3) {
-        this.games = this.games.filter((game2) => game2.code !== game.code);
-        this.server.emit(game.code, { event: 'end', game: this.filterGame(game) });
+    game.users = game.users.filter((user) => user.id !== client.id);
+    if (game.ownerId === client.id) {
+      if (game.users.length > 0)
+        game.ownerId = game.users[0].id;
+      else {
+        this.games.filter((game2) => game2.code !== game.code);
+        console.log('deleted game ' + game.code);
         return;
       }
-      if (game.askerId === client.id)
-      {
-        game.askerId = game.users[Math.floor(Math.random() * game.users.length)].id;
-        this.newRound(game);
-        this.server.emit(game.code, { event: 'leave', leaver: this.findUserById(game, client.id).name });
-      }
-      this.server.emit(game.code, { event: 'game', game: this.filterGame(game) });
+    }
+    if (game.users.length < 3) {
+      this.games = this.games.filter((game2) => game2.code !== game.code);
+      this.server.emit(game.code, { event: 'end', game: this.filterGame(game) });
+      return;
+    }
+    if (game.askerId === client.id) {
+      game.askerId = game.users[Math.floor(Math.random() * game.users.length)].id;
+      this.newRound(game);
+      this.server.emit(game.code, { event: 'leave', leaver: this.findUserById(game, client.id).name });
+    }
+    this.server.emit(game.code, { event: 'game', game: this.filterGame(game) });
   }
 
 
@@ -160,6 +159,20 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         event: 'waiting',
         waiting: waitingUsers,
       });
+  }
+
+  @SubscribeMessage('voting')
+  voting(@MessageBody() payload: {
+    id: string,
+    code: string,
+    card: number
+  }) {
+    const game = this.findGameByCode(payload.code);
+    if (payload.id === game.askerId) {
+      this.server.emit(game.code, { event: 'picking', card: payload.card });
+    } else
+      this.server.to(payload.id).emit('error', 'you can\'t vote');
+
   }
 
   @SubscribeMessage('vote')
