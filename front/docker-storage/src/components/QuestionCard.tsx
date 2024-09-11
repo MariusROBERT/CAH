@@ -1,4 +1,4 @@
-import { Card, Text } from '@mantine/core';
+import { Card, ScrollArea, Text } from '@mantine/core';
 
 interface Props {
   question: string,
@@ -10,7 +10,9 @@ export default function QuestionCard(props: Props) {
           w={160} h={225} pos={'absolute'} top={15} bg={'dark'}
           className={''}
     >
-      <Text c={'white'} size={'sm'} ta={'left'}>{props.question}</Text>
+      <ScrollArea mah={225} maw={160} type={'never'}>
+        <Text c={'white'} size={'sm'} ta={'left'}>{props.question}</Text>
+      </ScrollArea>
     </Card>
   );
 }
