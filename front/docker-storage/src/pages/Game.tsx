@@ -64,7 +64,6 @@ export default function Game() {
       });
   }
 
-
   function gameInfos(payload: any) {
     switch (payload?.event) {
       case 'game':
@@ -163,6 +162,7 @@ export default function Game() {
   useEffect(() => {
     socket?.on('error', handleErrors);
     socket?.on('join', joinHandler);
+    console.log('on join');
     if (gameCode) {
       socket?.on(gameCode, gameInfos);
     }
@@ -179,10 +179,10 @@ export default function Game() {
       close();
   }, [game, socket]);
 
-  useEffect(() => {
-    if (socket?.id)
+  socket?.on('connect', () => {
+    if (gameCode)
       socketSend('checkGame', { code: gameCode });
-  }, []);
+  });
 
 
   const move = (source: { id: number, text: string }[],
