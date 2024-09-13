@@ -41,7 +41,7 @@ export default function Welcome() {
 
   function joinGame() {
     if (code.length == 6)
-      socket?.emit('checkGame', { id: socket?.id, code });
+      socket?.emit('checkGame', { id: socket?.id, code: code.toUpperCase() });
   }
 
   function joinListener() {
