@@ -32,7 +32,7 @@ import { modals } from '@mantine/modals';
 import { faBars, faCopy } from '@fortawesome/free-solid-svg-icons';
 
 export default function Game() {
-  const [gameCode] = useState((new URLSearchParams(window.location.search)).get('code'));
+  const [gameCode] = useState((new URLSearchParams(window.location.search)).get('code')?.toUpperCase());
   const [name, setName] = useState<string>('');
 
   const [playedCards, setPlayedCards] = useListState<{ id: number, text: string }>([]);
@@ -149,7 +149,7 @@ export default function Game() {
                 ))}
             </Table.Tbody>
           </Table>
-          <Anchor href={'/'}>
+          <Anchor href={'/'} p={'sm'}>
             <Button>Retourner a l'accueil</Button>
           </Anchor>
         </Flex>
@@ -296,7 +296,6 @@ export default function Game() {
         </HoverCard>
       </Group>
       <QuestionCard question={game.question?.text ?? ''} />
-      <Text>{winner ? `${winner} remporte la manche !` : null}</Text>
       <DragDropContext
         onDragEnd={({ destination, source }) => {
 
@@ -318,9 +317,10 @@ export default function Game() {
           }
         }}
       >
-        <Flex direction={'column'} align={'center'}>
+        <Flex direction={'column'} align={'center'} pt={{ base: 160, xs: 50 }}>
+        <Text>{winner ? `${winner} remporte la manche !` : ""}</Text>
           {!allPlayedCards.length ?
-            <Text p={'xl'}>En attente de {waitingUsers.join(', ')}</Text> : null}
+            <Text p={{ base: 'md', sm: 'xl' }}>En attente de {waitingUsers.join(', ')}</Text> : null}
           {allPlayedCards.length === game.users.length - 1 ?
             <Voting playerNumber={game.users.length - 1} cards={allPlayedCards}
                     isAsker={game.askerId === socket?.id}

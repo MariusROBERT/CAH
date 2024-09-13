@@ -14,7 +14,7 @@ export default function App() {
     <MantineProvider>
       <GameProvider>
         <SocketProvider>
-          <Center h={'100vh'} p={0} m={0}>
+          <Center mih={'90vh'} p={0} m={0}>
             <Notifications />
             <ModalsProvider>
               <BrowserRouter>

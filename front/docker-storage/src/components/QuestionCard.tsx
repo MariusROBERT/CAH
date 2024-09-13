@@ -7,11 +7,15 @@ interface Props {
 export default function QuestionCard(props: Props) {
   return (
     <Card shadow={'sm'} withBorder radius={'lg'}
-          w={160} h={225} pos={'absolute'} top={15} bg={'dark'}
-          className={''}
+          w={{ base: 120, xs: 160 }} h={{ base: 170, xs: 225 }}
+          pos={'absolute'} top={15}
+          bg={'dark'}
     >
-      <ScrollArea mah={225} maw={160} type={'never'}>
-        <Text c={'white'} size={'sm'} ta={'left'}>{props.question}</Text>
+      <ScrollArea mah={{ base: 170, xs: 225 }}
+                  maw={{ base: 120, xs: 160 }}
+                  type={'never'}>
+        <Text c={'white'} size={'xs'} ta={'left'} hiddenFrom={'xs'}>{props.question}</Text>
+        <Text c={'white'} size={'sm'} ta={'left'} visibleFrom={'xs'}>{props.question}</Text>
       </ScrollArea>
     </Card>
   );

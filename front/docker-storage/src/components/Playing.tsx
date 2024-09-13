@@ -33,7 +33,9 @@ export default function Playing(props: Props) {
       <Flex direction={'column'}>
         <Text fs={'italic'}>Vos cartes jouées</Text>
         <Card shadow={'sm'} withBorder radius={'lg'}
-              w={(game?.question?.answer ?? 1) * 160} h={230} pos={'relative'}
+              w={{base: (game?.question?.answer ?? 1) * 140 ,xs: (game?.question?.answer ?? 1) * 160}}
+              h={{base: 180, xs: 230 }}
+              pos={'relative'}
               className={'played'}
         >
           <Droppable droppableId={'played-cards'} direction={'horizontal'}
@@ -71,10 +73,10 @@ export default function Playing(props: Props) {
         <Droppable droppableId={'answer-cards'} direction={'horizontal'}>
           {(provided) => (
             <Center>
-              <ScrollArea maw={'100vw'} pos={'fixed'} left={0} bottom={-30} px={'sm'}>
+              <ScrollArea maw={'100vw'} pos={'fixed'} left={0} bottom={{ base: -50, xs: -30}} px={'sm'}>
                 <Flex className={'hand'}
-                      mx={'md'}
-                      mt={30}
+                      mx={{ base: 'lg', xs: 'md'}}
+                      mt={{ base: 50, xs: 30}}
                       {...provided.droppableProps}
                       ref={provided.innerRef}>
                   {props.answerCards.map((item, index) => (
