@@ -57,15 +57,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
     }
-    if (game.users.length < 3) {
-      this.games = this.games.filter((game2) => game2.code !== game.code);
-      this.server.emit(game.code, { event: 'end', game: this.filterGame(game) });
-      return;
-    }
-    if (game.askerId === client.id) {
-      game.askerId = game.users[Math.floor(Math.random() * game.users.length)].id;
-      this.newRound(game);
-      this.server.emit(game.code, { event: 'leave', leaver: this.findUserById(game, client.id).name });
+    if (game.started) {
+      if (game.users.length < 3) {
+        this.games = this.games.filter((game2) => game2.code !== game.code);
+        this.server.emit(game.code, { event: 'end', game: this.filterGame(game) });
+        return;
+      }
+      if (game.askerId === client.id) {
+        game.askerId = game.users[Math.floor(Math.random() * game.users.length)].id;
+        this.newRound(game);
+        this.server.emit(game.code, { event: 'leave', leaver: this.findUserById(game, client.id).name });
+      }
     }
     this.server.emit(game.code, { event: 'game', game: this.filterGame(game) });
   }
